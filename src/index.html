@@ -43,7 +43,7 @@
 </style>
 <div class="sfo">
   <h1 id="title">Sana Financial Operations</h1>
-  <p class="take" id="takeaway" data-draw="takeaway" data-source="months ledger">—</p>
+  <p class="take" id="takeaway" data-draw="takeaway" data-source="months">—</p>
 
   <div class="bar" id="bar">
     <nav class="tabs" role="tablist" aria-label="Sections">
@@ -61,7 +61,7 @@
     <div class="grid2">
       <div>
         <h3 id="h-sales">Sales by month</h3>
-        <p class="sub">Sana = Trybe net sales. Restaurant = POS net sales after discounts and refunds, before tax and tips. Click a bar to pick that month. Faded bars are part months.</p>
+        <p class="sub">Sana = Trybe net sales. Restaurant = POS net sales after discounts and refunds, before tax and tips. Click a bar to pick that month. Faded bars are part months; the dashed outline is the current month at its daily pace so far.</p>
         <div class="chart" id="salesChart" data-draw="salesChart" data-source="months"></div>
       </div>
       <div>
@@ -215,10 +215,12 @@ dash.calc('forecast',{inputs:['months','trybe_monthly','pos_monthly','seasonal']
   return out;
 }});
 S.M=()=>{const d=dash.data('months');return d.status==='ok'&&d.data&&d.data.length?d.data:null;};
-S.pick=ms=>{if(!S.month||!ms.find(r=>r.month===S.month)){const f=ms.filter(r=>r.full);S.month=(f.length?f[f.length-1]:ms[ms.length-1]).month;}const i=ms.findIndex(r=>r.month===S.month);return {c:ms[i],p:i>0?ms[i-1]:null};};
+S.pick=ms=>{if(!S.month||!ms.find(r=>r.month===S.month)){const f=ms.filter(r=>r.full),l=ms[ms.length-1];S.month=(l.full||l.aligned||!f.length?l:f[f.length-1]).month;}const i=ms.findIndex(r=>r.month===S.month);return {c:ms[i],p:i>0?ms[i-1]:null};};
 S.ALL=['takeaway','monthSel','ovKpis','salesChart','ovTable','sanaKpis','sanaTable','kitKpis','stKpis','stTable'];
 S.select=m=>{S.month=m;S.ALL.forEach(n=>dash.draw(n));};
 S.cmp=(c,p)=>!!(p&&c.full&&p.full);
+S.fk3=d3.format('$.3~s');
+S.ctx=s=>{const c=s.c,p=s.p&&s.p.full?s.p:null,ok=!!(p&&(c.full||c.aligned)),f=c.full?1:S.DIM(c.month)/c.cover_end,sh=p?S.mshort(p.month):'';return {c,f,p:ok?p:null,pace:ok&&!c.full,D:(a,b,good,rate)=>{if(!ok||!b)return {t:c.full?'':'part month',c:''};const v=((rate?a:a*f)-b)/Math.abs(b)*100,up=v>=0;return {t:(up?'+':'')+S.fp(v)+'% '+(rate||c.full?'vs ':'pace vs ')+sh,c:good==null?'':(up===good?'good':'bad')};}};};
 S.delta=(a,b,good)=>{if(!b)return {t:'',c:''};const v=(a-b)/Math.abs(b)*100,up=v>=0;return {t:(up?'+':'')+S.fp(v)+'% vs '+'prior month',c:good==null?'':(up===good?'good':'bad')};};
 S.cards=(el,list)=>{el.replaceChildren();list.forEach(a=>{const d=document.createElement('div');d.className='card';const l=document.createElement('div');l.className='l';l.textContent=a[0];const v=document.createElement('div');v.className='v';v.textContent=a[1];const s=document.createElement('div');s.className='d '+((a[2]&&a[2].c)||'');s.textContent=(a[2]&&a[2].t)||'';d.append(l,v,s);el.append(d);});};
 S.tbl=(el,head,body)=>{const t=d3.select(el);t.selectAll('*').remove();t.append('thead').append('tr').selectAll('th').data(head).join('th').text(d=>d);const tb=t.append('tbody');body.forEach(r=>{const tr=tb.append('tr').attr('class',r.cls||null);if(r.on)tr.style('cursor','pointer').on('click',r.on);tr.selectAll('td').data(r.cells).join('td').text(d=>d==null?'':d);});};
@@ -227,28 +229,28 @@ S.stack=(el,rows,keys,names,fmt,opt)=>{opt=opt||{};el.replaceChildren();
   const w=el.clientWidth||600,h=250,m={t:10,r:8,b:24,l:50},cols=dash.colors;
   const svg=d3.select(el).append('svg').attr('width',w).attr('height',h).attr('role','img').attr('aria-label',opt.aria||('Stacked bars of '+names.join(' and ')+' by month'));
   const K=r=>r._k||r._x,lab={};rows.forEach(r=>{lab[K(r)]=r._x;});const x=d3.scaleBand().domain(rows.map(K)).range([m.l,w-m.r]).padding(0.22),tot=r=>d3.sum(keys,k=>r[k]);
-  const y=d3.scaleLinear().domain([0,(d3.max(rows,tot)||1)*1.08]).nice().range([h-m.b,m.t]),st=Math.max(1,Math.ceil(40/x.step()));
+  const y=d3.scaleLinear().domain([0,(d3.max(rows,r=>Math.max(tot(r),r._ghost||0))||1)*1.08]).nice().range([h-m.b,m.t]),st=Math.max(1,Math.ceil(40/x.step()));
   svg.append('g').attr('transform','translate(0,'+(h-m.b)+')').call(d3.axisBottom(x).tickSizeOuter(0).tickValues(x.domain().filter((d,i)=>i%st===0)).tickFormat(d=>lab[d])).call(S.axisStyle);
   svg.append('g').attr('transform','translate('+m.l+',0)').call(d3.axisLeft(y).ticks(4).tickSize(-(w-m.l-m.r)).tickFormat(opt.yfmt||S.fk)).call(g=>g.select('.domain').remove()).call(S.axisStyle).call(g=>g.selectAll('line').style('stroke','var(--cds-chart-grid)'));
   const tip=d3.select(el).append('div').attr('class','tip').style('display','none');
   rows.forEach(r=>{let acc=0;keys.forEach((k,i)=>{const y0=y(acc),y1=y(acc+(r[k]||0));acc+=r[k]||0;
-    svg.append('rect').attr('x',x(K(r))).attr('width',x.bandwidth()).attr('y',y1).attr('height',Math.max(0,y0-y1)).style('fill',cols[i%cols.length]).style('opacity',(opt.sel&&!opt.sel(r))?0.35:(r._part?0.55:1)).style('cursor',opt.pick?'pointer':null)
+    svg.append('rect').attr('x',x(K(r))).attr('width',x.bandwidth()).attr('y',y1).attr('height',Math.max(0,y0-y1)).style('fill',cols[i%cols.length]).style('opacity',opt.sel?(opt.sel(r)?1:(r._part?0.25:0.4)):(r._part?0.55:1)).style('cursor',opt.pick?'pointer':null)
       .on('click',()=>{if(opt.pick)opt.pick(r);}).on('mousemove',ev=>{const q=d3.pointer(ev,el);tip.style('display','block').style('left',Math.min(q[0]+10,w-190)+'px').style('top',Math.max(0,q[1]-42)+'px').text(r._lab+' · '+names[i]+' '+fmt(r[k]||0)+' · total '+fmt(tot(r)));}).on('mouseleave',()=>tip.style('display','none'));});});
+  rows.forEach(r=>{if(!(r._ghost>tot(r)))return;svg.append('rect').attr('x',x(K(r))).attr('width',x.bandwidth()).attr('y',y(r._ghost)).attr('height',Math.max(0,y(tot(r))-y(r._ghost))).style('fill','none').style('stroke','var(--cds-chart-reference)').style('stroke-dasharray','4 3');svg.append('text').attr('x',x(K(r))+x.bandwidth()/2).attr('y',y(r._ghost)-4).attr('text-anchor','middle').text('pace '+S.fk3(r._ghost)).style('fill','var(--cds-text-secondary)').style('font-size','10px');});
   const lg=d3.select(el).append('div').attr('class','legend');names.forEach((n,i)=>{const s=lg.append('span');s.append('i').style('background',cols[i%cols.length]);s.append('span').text(n);});};
 
 dash.draw('monthSel',sel=>{const ms=S.M();sel.replaceChildren();if(!ms)return;ms.slice().reverse().forEach(m=>sel.append(new Option(m.label,m.month)));S.pick(ms);sel.value=S.month;sel.onchange=()=>S.select(sel.value);});
 dash.draw('takeaway',el=>{const ms=S.M();if(!ms){el.textContent='—';return;}const s=S.pick(ms),c=s.c,p=s.p;
   let t=c.label+': '+S.f0(c.sales)+' in sales (Sana '+S.f0(c.sana_net)+', restaurant '+S.f0(c.rest_net)+')';
-  t+=S.cmp(c,p)?', '+((c.sales>=p.sales)?'up ':'down ')+S.fp(Math.abs((c.sales-p.sales)/p.sales*100))+'% on '+S.mshort(p.month):'';
+  const X=S.ctx(s);if(X.p){const v=(c.sales*X.f-X.p.sales)/X.p.sales*100;t+=(X.pace?', on pace for '+S.f0(c.sales*X.f)+' for the month,':',')+' '+(v>=0?'up ':'down ')+S.fp(Math.abs(v))+'% on '+S.mshort(X.p.month);}
   t+=c.lab_pct!=null?'. Estimated labour, including salaries, ran about '+S.fp(c.lab_pct)+'% of sales':'';
-  const L=dash.data('ledger');if(L.status==='ok'&&L.data.length){const lp=d3.sum(L.data,r=>+r.profit);t+='. The ledger shows '+(lp<0?'a loss of ':'a profit of ')+S.f0(Math.abs(lp))+' after loan payments from '+S.mshort(L.data[0].month)+' to '+S.mshort(L.data[L.data.length-1].month);}
   el.textContent=t+'.';});
-dash.draw('ovKpis',el=>{const ms=S.M();if(!ms){el.replaceChildren();return;}const s=S.pick(ms),c=s.c,p=S.cmp(s.c,s.p)?s.p:null,n={t:c.full?'':'part month',c:''},D=(a,b,g)=>p?S.delta(a,b,g):n,sh=S.mshort(c.month);
-  S.cards(el,[['Total sales · '+sh,S.f0(c.sales),D(c.sales,p&&p.sales,true)],['Sana · '+sh,S.f0(c.sana_net),D(c.sana_net,p&&p.sana_net,true)],['Restaurant · '+sh,S.f0(c.rest_net),D(c.rest_net,p&&p.rest_net,true)],
+dash.draw('ovKpis',el=>{const ms=S.M();if(!ms){el.replaceChildren();return;}const s=S.pick(ms),X=S.ctx(s),c=s.c,p=X.p,n={t:c.full?'':'part month',c:''},D=(a,b,g,r)=>p?X.D(a,b,g,r):n,sh=S.mshort(c.month);
+  S.cards(el,[['Total sales · '+sh,S.f0(c.sales),X.pace?{t:'pace '+S.f0(c.sales*X.f)+' · '+X.D(c.sales,p.sales,true).t.replace('pace ',''),c:X.D(c.sales,p.sales,true).c}:D(c.sales,p&&p.sales,true)],['Sana · '+sh,S.f0(c.sana_net),D(c.sana_net,p&&p.sana_net,true)],['Restaurant · '+sh,S.f0(c.rest_net),D(c.rest_net,p&&p.rest_net,true)],
     ['Labour cost (est.) · '+sh,S.f0(c.lab_cost),{t:c.lab_pct!=null?S.fp(c.lab_pct)+'% of sales':'days differ',c:''}],['Sales per labour hour · '+sh,c.sales_per_hr!=null?S.f1(c.sales_per_hr):'n/a',p&&c.sales_per_hr!=null?S.delta(c.sales_per_hr,p.sales_per_hr,true):n],
     ['Sana occupancy · '+sh,S.fp(c.sana_occ)+'%',p?{t:(c.sana_occ>=p.sana_occ?'+':'')+S.fp(c.sana_occ-p.sana_occ)+' pts vs prior month',c:c.sana_occ>=p.sana_occ?'good':'bad'}:n]]);});
 dash.draw('salesChart',el=>{const ms=S.M();if(!ms){el.replaceChildren();return;}const cur=S.pick(ms).c.month;
-  S.stack(el,ms.map(r=>Object.assign({},r,{_k:r.month,_x:S.mshort(r.month),_lab:r.label,_part:!r.full})),['sana_net','rest_net'],['Sana','Restaurant'],S.f0,{pick:r=>S.select(r.month),sel:r=>r.month===cur,aria:'Monthly sales, Sana and restaurant stacked'});});
+  S.stack(el,ms.map(r=>Object.assign({},r,{_k:r.month,_x:S.mshort(r.month),_lab:r.label,_part:!r.full,_ghost:!r.full&&r.aligned?r.sales*S.DIM(r.month)/r.cover_end:0})),['sana_net','rest_net'],['Sana','Restaurant'],S.f0,{pick:r=>S.select(r.month),sel:r=>r.month===cur,aria:'Monthly sales, Sana and restaurant stacked'});});
 dash.draw('ledgerChart',el=>{const L=dash.data('ledger');el.replaceChildren();if(L.status!=='ok'||!L.data.length)return;
   const rows=L.data.map(r=>({m:r.month,v:+r.profit,lab:r.label})),w=el.clientWidth||600,h=250,mg={t:18,r:8,b:24,l:54};
   const x=d3.scaleBand().domain(rows.map(r=>S.mshort(r.m))).range([mg.l,w-mg.r]).padding(0.28),y=d3.scaleLinear().domain([Math.min(0,d3.min(rows,r=>r.v)),Math.max(0,d3.max(rows,r=>r.v))]).nice().range([h-mg.b,mg.t]);
@@ -262,17 +264,17 @@ dash.draw('ledgerChart',el=>{const L=dash.data('ledger');el.replaceChildren();if
 dash.draw('ovTable',el=>{const ms=S.M();if(!ms){d3.select(el).selectAll('*').remove();return;}
   S.tbl(el,['Month','Sana','Restaurant','Total','Labour hrs','Labour cost (est.)','Labour %','Ledger profit'],ms.slice().reverse().map(r=>({cls:r.month===S.month?'sel':null,on:()=>S.select(r.month),cells:[r.label,S.f0(r.sana_net),S.f0(r.rest_net),S.f0(r.sales),S.fh(r.hrs),S.f0(r.lab_cost),r.lab_pct!=null?S.fp(r.lab_pct)+'%':'n/a',r.ledger_profit!=null?S.f0(r.ledger_profit):'']})));});
 
-dash.draw('sanaKpis',el=>{const ms=S.M();if(!ms){el.replaceChildren();return;}const s=S.pick(ms),c=s.c,p=S.cmp(s.c,s.p)?s.p:null,n={t:c.full?'':'part month',c:''},sh=S.mshort(c.month),D=(a,b,g)=>p?S.delta(a,b,g):n;
+dash.draw('sanaKpis',el=>{const ms=S.M();if(!ms){el.replaceChildren();return;}const s=S.pick(ms),X=S.ctx(s),c=s.c,p=X.p,n={t:c.full?'':'part month',c:''},sh=S.mshort(c.month),D=(a,b,g,r)=>p?X.D(a,b,g,r):n;
   const F=dash.data('founding'),fr=F.status==='ok'?F.data.find(r=>r.key===c.month):null;
   S.cards(el,[['Sana sales · '+sh,S.f0(c.sana_net),D(c.sana_net,p&&p.sana_net,true)],['Guests · '+sh,S.fh(c.sana_guests),D(c.sana_guests,p&&p.sana_guests,true)],['Occupancy · '+sh,S.fp(c.sana_occ)+'%',p?{t:(c.sana_occ>=p.sana_occ?'+':'')+S.fp(c.sana_occ-p.sana_occ)+' pts',c:c.sana_occ>=p.sana_occ?'good':'bad'}:n],
-    ['Sales per guest · '+sh,S.f1(c.sana_per_guest),D(c.sana_per_guest,p&&p.sana_per_guest,true)],['Booked online · '+sh,S.fp(c.sana_online)+'%',{t:'median lead '+S.fp(c.sana_lead)+' h',c:''}],['Founding members · '+sh,fr?S.fh(+fr.active):'—',{t:fr?S.f0(+fr.revenue)+' collected':'',c:''}]]);});
+    ['Sales per guest · '+sh,S.f1(c.sana_per_guest),D(c.sana_per_guest,p&&p.sana_per_guest,true,1)],['Booked online · '+sh,S.fp(c.sana_online)+'%',{t:'median lead '+S.fp(c.sana_lead)+' h',c:''}],['Founding members · '+sh,fr?S.fh(+fr.active):'—',{t:fr?S.f0(+fr.revenue)+' collected':'',c:''}]]);});
 dash.draw('sanaWeek',el=>{const d=dash.data('trybe_monthly');if(d.status!=='ok'){el.replaceChildren();return;}
   const ws=d.data.filter(r=>r.kind==='week').map(r=>({_k:r.key,_x:d3.utcFormat('%b %-d')(new Date(r.start+'T00:00:00Z')),_lab:r.month,_part:/\(to /.test(r.month),pass:+r.pass_net,other:+r.other_net}));
   S.stack(el,ws,['pass','other'],['Day passes','Products, memberships and other'],S.f0,{aria:'Weekly Sana sales, day passes and other sales stacked'});});
 dash.draw('sanaTable',el=>{const ms=S.M();if(!ms){d3.select(el).selectAll('*').remove();return;}const F=dash.data('founding'),fd=F.status==='ok'?F.data:[];
   S.tbl(el,['Month','Sales','Guests','Occupancy','Per guest','Online','Lead (h)','Promo %','Founding members','Founding revenue'],ms.slice().reverse().map(r=>{const f=fd.find(q=>q.key===r.month);return {cls:r.month===S.month?'sel':null,on:()=>S.select(r.month),cells:[r.label,S.f0(r.sana_net),S.fh(r.sana_guests),S.fp(r.sana_occ)+'%',S.f1(r.sana_per_guest),S.fp(r.sana_online)+'%',S.fp(r.sana_lead),S.fp(r.sana_promo_pct)+'%',f?f.active:'',f?S.f0(+f.revenue):'']};}));});
 
-dash.draw('kitKpis',el=>{const ms=S.M();if(!ms){el.replaceChildren();return;}const s=S.pick(ms),c=s.c,p=S.cmp(s.c,s.p)?s.p:null,n={t:c.full?'':'part month',c:''},sh=S.mshort(c.month),D=(a,b,g)=>p?S.delta(a,b,g):n;
+dash.draw('kitKpis',el=>{const ms=S.M();if(!ms){el.replaceChildren();return;}const s=S.pick(ms),X=S.ctx(s),c=s.c,p=X.p,n={t:c.full?'':'part month',c:''},sh=S.mshort(c.month),D=(a,b,g,r)=>p?X.D(a,b,g,r):n;
   S.cards(el,[['Restaurant sales · '+sh,S.f0(c.rest_net),D(c.rest_net,p&&p.rest_net,true)],['Food · '+sh,c.rest_food?S.f0(c.rest_food):'—',{t:c.rest_food&&c.rest_net?S.fp(c.rest_food/c.rest_net*100)+'% of sales':'',c:''}],['Drinks · '+sh,c.rest_drinks?S.f0(c.rest_drinks):'—',{t:c.rest_drinks&&c.rest_net?S.fp(c.rest_drinks/c.rest_net*100)+'% of sales':'',c:''}],
     ['Checks · '+sh,S.fh(c.rest_checks),{t:'avg '+S.f1(c.rest_avg_check),c:''}],['Discounts · '+sh,S.f0(c.rest_disc),{t:S.fp(c.rest_disc_pct)+'% of gross',c:p?(c.rest_disc_pct<=p.rest_disc_pct?'good':'bad'):''}],['Voids and refunds · '+sh,S.f0(c.rest_voids+c.rest_refunds),{t:S.f0(c.rest_voids)+' voids, '+S.f0(c.rest_refunds)+' refunds',c:''}]]);});
 dash.draw('kitChart',el=>{const P=dash.data('pos_monthly'),X=dash.data('restmix');if(P.status!=='ok'){el.replaceChildren();return;}const xs=X.status==='ok'?X.data:[];
@@ -283,7 +285,7 @@ dash.draw('kitTable',el=>{const P=dash.data('pos_monthly');if(P.status!=='ok'){d
   const a=P.data.find(r=>r.kind==='all');if(a)rows.push({cls:'tot',cells:['Since opening',S.f0(+a.gross),S.f0(+a.discounts),S.fp(+a.disc_pct)+'%',S.f0(+a.voids),S.f0(+a.refunds),S.f0(+a.net),S.fh(+a.checks),S.f1(+a.avg_check)]});
   S.tbl(el,['Month','Gross','Discounts','% of gross','Voids','Refunds','Net sales','Checks','Avg check'],rows);});
 
-dash.draw('stKpis',el=>{const ms=S.M();if(!ms){el.replaceChildren();return;}const s=S.pick(ms),c=s.c,p=S.cmp(s.c,s.p)?s.p:null,n={t:c.full?'':'part month',c:''},sh=S.mshort(c.month),D=(a,b,g)=>p?S.delta(a,b,g):n,pc=v=>v!=null?S.fp(v)+'%':'n/a';
+dash.draw('stKpis',el=>{const ms=S.M();if(!ms){el.replaceChildren();return;}const s=S.pick(ms),X=S.ctx(s),c=s.c,p=X.p,n={t:c.full?'':'part month',c:''},sh=S.mshort(c.month),D=(a,b,g,r)=>p?X.D(a,b,g,r):n,pc=v=>v!=null?S.fp(v)+'%':'n/a';
   S.cards(el,[['Clocked hours · '+sh,S.fh(c.hrs),D(c.hrs,p&&p.hrs,null)],['Labour cost (est.) · '+sh,S.f0(c.lab_cost),{t:'incl. '+S.f0(c.lab_salaries)+' salaries',c:''}],['Labour % of sales · '+sh,pc(c.lab_pct),p&&c.lab_pct!=null?{t:(c.lab_pct<=p.lab_pct?'':'+')+S.fp(c.lab_pct-p.lab_pct)+' pts',c:c.lab_pct<=p.lab_pct?'good':'bad'}:n],
     ['Sales per labour hour · '+sh,c.sales_per_hr!=null?S.f1(c.sales_per_hr):'n/a',p&&c.sales_per_hr!=null?S.delta(c.sales_per_hr,p.sales_per_hr,true):n],['Sana staff % of Sana sales',pc(c.sana_lab_pct),{t:S.fh(c.hrs_sana)+' hrs',c:''}],['Restaurant staff % of its sales',pc(c.rest_lab_pct),{t:S.fh(c.hrs_floor+c.hrs_kitchen)+' hrs, chef salaried',c:''}]]);});
 dash.draw('stChart',el=>{const ms=S.M();if(!ms){el.replaceChildren();return;}
