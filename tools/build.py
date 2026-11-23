@@ -20,7 +20,7 @@ ITER = 250_000
 FILES = {
     'trybe_monthly': 'trybe_monthly.csv', 'founding': 'founding.csv', 'pos_monthly': 'pos_monthly.csv',
     'labour': 'labour.csv', 'restmix': 'restmix.csv', 'ledger': 'ledger.csv',
-    'costcalc': 'costcalc.csv', 'seasonal': 'seasonal.csv',
+    'costcalc': 'costcalc.csv', 'seasonal': 'seasonal.csv', 'salaries': 'salaries.csv',
 }
 
 TOKENS = """

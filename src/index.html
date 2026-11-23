@@ -70,9 +70,12 @@
         <div class="chart" id="ledgerChart" data-draw="ledgerChart" data-source="ledger"></div>
       </div>
     </div>
+    <h3 id="h-lab">Labour against sales, by side</h3>
+    <p class="sub">Light bar = that side's sales; dark bar = its labour: clocked hours at all-in rates plus its salaried lead (Adrienne, wellness manager, on Sana; Jonah, head chef, on the restaurant). The figure above each pair is labour as a share of sales. From July, when the current salary setup began.</p>
+    <div class="chart" id="labChart" data-draw="labChart" data-source="months salaries"></div>
     <h3 id="h-sides">What each side earns after its own costs</h3>
-    <p class="sub">Sales minus that side's direct costs: staff hours, fees and consumables for Sana; food and drink cost, kitchen and floor hours and fees for the restaurant. The dashed line also takes off rent, hydro, management salaries and other fixed costs. Costed at the August–September rates, so earlier months read better than the ledger did. The head chef's salary sits in the shared line, not the restaurant.</p>
-    <div class="chart" id="sideChart" data-draw="sideChart" data-source="months"></div>
+    <p class="sub">Sales minus that side's own costs: its labour and salaried lead, fees and consumables for Sana; food and drink cost, labour, head chef and fees for the restaurant. The dashed line then takes off rent, hydro and other fixed costs. Costed at the August–September rates and September salaries; starts in July, when the current salary setup began.</p>
+    <div class="chart" id="sideChart" data-draw="sideChart" data-source="months salaries"></div>
     <h3 id="h-ovtable">Month by month</h3>
     <div class="wrap"><table id="ovTable" data-draw="ovTable" data-source="months"></table></div>
     <p class="note">Labour cost is an estimate: clocked hours at all-in hourly rates worked out from the August–September ledger, plus management salaries. n/a where sales and hours cover different days.</p>
@@ -182,7 +185,7 @@ dash.calc('restmix',{inputs:['pos_dept'],title:'Restaurant food and drink sales 
     const o=by[p]||(by[p]={month:p,rest_food:0,rest_drinks:0});if(d==='Food total')o.rest_food=+r.net||0;else if(d==='Drinks total')o.rest_drinks=+r.net||0;});
   return Object.values(by).sort((a,b)=>a.month<b.month?-1:1);
 }});
-dash.calc('months',{inputs:['trybe_monthly','pos_monthly','labour','restmix','costcalc','ledger'],title:'Business by month',description:'Sana (Trybe), restaurant (POS) and Push hours joined by month from Sana\'s Trybe launch. Labour cost = hours at the ledger hourly rates (Sana, floor, kitchen) plus management salaries for the days covered. Head chef hours are salaried, so they are counted in salaries, not by the hour.',fn:(trybe_monthly,pos_monthly,labour,restmix,costcalc,ledger)=>{
+dash.calc('months',{inputs:['trybe_monthly','pos_monthly','labour','restmix','costcalc','ledger','salaries'],title:'Business by month',description:'Sana (Trybe), restaurant (POS) and Push hours joined by month from Sana\'s Trybe launch. Labour cost = hours at the ledger hourly rates (Sana, floor, kitchen) plus management salaries for the days covered. Head chef hours are salaried, so they are counted in salaries, not by the hour.',fn:(trybe_monthly,pos_monthly,labour,restmix,costcalc,ledger,salaries)=>{
   const R=k=>{const r=(costcalc||[]).find(x=>String(x.input).startsWith(k));return r?+r.value:0;};
   const wS=R('Sana staff'),wF=R('Floor'),wK=R('Kitchen'),sal=R('Management salaries'),fc=R('Food and drink cost'),fe=R('Card and bank fees'),sv=R('Sana retail'),fx=R('Rent')+R('Hydro')+R('Marketing')+R('Supplies')+R('Legal')+R('Subcontractors');
   const N=v=>+v||0,out=[];
@@ -193,13 +196,14 @@ dash.calc('months',{inputs:['trybe_monthly','pos_monthly','labour','restmix','co
     const full=s0===1&&s1===dim&&p1===dim&&ld===dim,aligned=s0===1&&s1===p1&&p1===ld;
     const hs=N(l.hrs_wellness),hf=N(l.hrs_foh),hk=N(l.hrs_boh),hc=N(l.hrs_boh_salary),hm=N(l.hrs_mgmt),hrs=hs+hf+hk+hc+hm;
     const sana=N(t.net),rest=N(p.net),sales=sana+rest,labS=hs*wS,labR=hf*wF+hk*wK,salM=sal*Math.min(s1,p1,ld)/dim,lab=labS+labR+salM;
+    const fr=Math.min(s1,p1,ld)/dim,sr=(salaries||[]).filter(q=>q.from_month<=key).sort((a,b)=>a.from_month<b.from_month?1:-1)[0],sS=sr?N(sr.sana_salary)*fr:0,sR=sr?N(sr.rest_salary)*fr:0;
     const r2=v=>Math.round(v*100)/100,r1=v=>Math.round(v*10)/10;
     out.push({month:key,label:S.mlab(key)+(full?'':(s0>1?' (from '+s0+')':' (to '+Math.min(s1,p1)+')')),full:full?1:0,aligned:aligned?1:0,cover_end:Math.min(s1,p1,ld),
       sana_net:r2(sana),sana_guests:N(t.guests),sana_occ:N(t.occ_pct),sana_per_guest:N(t.net_per_guest),sana_online:N(t.online_pct),sana_lead:N(t.med_lead_h),sana_promo_pct:N(t.promo_pct),
       rest_net:r2(rest),rest_gross:N(p.gross),rest_disc:N(p.discounts),rest_disc_pct:N(p.disc_pct),rest_voids:N(p.voids),rest_refunds:N(p.refunds),rest_checks:N(p.checks),rest_avg_check:N(p.avg_check),rest_food:N(x.rest_food),rest_drinks:N(x.rest_drinks),
       sales:r2(sales),hrs_sana:hs,hrs_floor:hf,hrs_kitchen:hk,hrs_chef:hc,hrs_mgmt:hm,hrs:r2(hrs),
-      lab_sana:Math.round(labS),lab_rest:Math.round(labR),lab_salaries:Math.round(salM),lab_cost:Math.round(lab),con_sana:Math.round(sana-sana*(fe+sv)/100-labS),con_rest:Math.round(rest-rest*(fc+fe)/100-labR),shared:Math.round((sal+fx)*Math.min(s1,p1,ld)/dim),
-      lab_pct:aligned&&sales?r1(lab/sales*100):null,sana_lab_pct:aligned&&sana?r1(labS/sana*100):null,rest_lab_pct:aligned&&rest?r1(labR/rest*100):null,sales_per_hr:aligned&&hrs?r1(sales/hrs):null,
+      lab_sana:Math.round(labS),lab_rest:Math.round(labR),lab_salaries:Math.round(salM),lab_cost:Math.round(lab),sal_split:sr?1:0,sal_sana:Math.round(sS),sal_rest:Math.round(sR),labx_sana:Math.round(labS+sS),labx_rest:Math.round(labR+sR),con_sana:Math.round(sana-sana*(fe+sv)/100-labS-sS),con_rest:Math.round(rest-rest*(fc+fe)/100-labR-sR),shared:Math.round(fx*fr+Math.max(0,salM-sS-sR)),
+      lab_pct:aligned&&sales?r1(lab/sales*100):null,sana_lab_pct:aligned&&sana?r1((labS+sS)/sana*100):null,rest_lab_pct:aligned&&rest?r1((labR+sR)/rest*100):null,sales_per_hr:aligned&&hrs?r1(sales/hrs):null,
       ledger_profit:g?N(g.profit):null,ledger_revenue:g?N(g.revenue):null});
   });
   return out;
@@ -290,14 +294,30 @@ dash.draw('kitTable',el=>{const P=dash.data('pos_monthly');if(P.status!=='ok'){d
 
 dash.draw('stKpis',el=>{const ms=S.M();if(!ms){el.replaceChildren();return;}const s=S.pick(ms),X=S.ctx(s),c=s.c,p=X.p,n={t:c.full?'':'part month',c:''},sh=S.mshort(c.month),D=(a,b,g,r)=>p?X.D(a,b,g,r):n,pc=v=>v!=null?S.fp(v)+'%':'n/a';
   S.cards(el,[['Clocked hours · '+sh,S.fh(c.hrs),D(c.hrs,p&&p.hrs,null)],['Labour cost (est.) · '+sh,S.f0(c.lab_cost),{t:'incl. '+S.f0(c.lab_salaries)+' salaries',c:''}],['Labour % of sales · '+sh,pc(c.lab_pct),p&&c.lab_pct!=null?{t:(c.lab_pct<=p.lab_pct?'':'+')+S.fp(c.lab_pct-p.lab_pct)+' pts',c:c.lab_pct<=p.lab_pct?'good':'bad'}:n],
-    ['Sales per labour hour · '+sh,c.sales_per_hr!=null?S.f1(c.sales_per_hr):'n/a',p&&c.sales_per_hr!=null?S.delta(c.sales_per_hr,p.sales_per_hr,true):n],['Sana staff % of Sana sales',pc(c.sana_lab_pct),{t:S.fh(c.hrs_sana)+' hrs',c:''}],['Restaurant staff % of its sales',pc(c.rest_lab_pct),{t:S.fh(c.hrs_floor+c.hrs_kitchen)+' hrs, chef salaried',c:''}]]);});
+    ['Sales per labour hour · '+sh,c.sales_per_hr!=null?S.f1(c.sales_per_hr):'n/a',p&&c.sales_per_hr!=null?S.delta(c.sales_per_hr,p.sales_per_hr,true):n],['Sana labour % of Sana sales',pc(c.sana_lab_pct),{t:S.fh(c.hrs_sana)+' hrs'+(c.sal_sana?' + manager':''),c:''}],['Restaurant labour % of its sales',pc(c.rest_lab_pct),{t:S.fh(c.hrs_floor+c.hrs_kitchen)+' hrs'+(c.sal_rest?' + head chef':''),c:c.rest_lab_pct>=100?'bad':''}]]);});
 dash.draw('stChart',el=>{const ms=S.M();if(!ms){el.replaceChildren();return;}
   S.stack(el,ms.map(r=>Object.assign({},r,{_k:r.month,_x:S.mshort(r.month),_lab:r.label,_part:!r.full})),['hrs_sana','hrs_floor','hrs_kitchen','hrs_chef','hrs_mgmt'],['Sana','Floor','Kitchen','Head chef','Management'],S.fh,{yfmt:d3.format('~s'),aria:'Clocked hours by team per month'});});
 dash.draw('stTable',el=>{const ms=S.M();if(!ms){d3.select(el).selectAll('*').remove();return;}
   S.tbl(el,['Month','Sana','Floor','Kitchen','Head chef','Mgmt','Total hrs','Hourly cost','Salaries','Labour %'],ms.slice().reverse().map(r=>({cls:r.month===S.month?'sel':null,on:()=>S.select(r.month),cells:[r.label,S.fh(r.hrs_sana),S.fh(r.hrs_floor),S.fh(r.hrs_kitchen),S.fh(r.hrs_chef),S.fh(r.hrs_mgmt),S.fh(r.hrs),S.f0(r.lab_sana+r.lab_rest),S.f0(r.lab_salaries),r.lab_pct!=null?S.fp(r.lab_pct)+'%':'n/a']})));});
 dash.draw('rateNote',el=>{const d=dash.data('costcalc');if(d.status!=='ok'){el.textContent='—';return;}const R=k=>{const r=d.data.find(x=>String(x.input).startsWith(k));return r?+r.value:0;};
   el.textContent='Hourly cost uses all-in rates from the August–September ledger (wages plus payroll costs, tips excluded): Sana staff $'+R('Sana staff').toFixed(2)+', floor $'+R('Floor').toFixed(2)+', kitchen $'+R('Kitchen').toFixed(2)+' an hour. Salaries are the manager and head chef at '+S.f0(R('Management salaries'))+' a month, so head chef hours carry no hourly cost. Rates before August are approximate. Restaurant staff also serve Sana guests, so the restaurant share reads high and Sana\'s low.';});
-dash.draw('sideChart',el=>{const ms=S.M();el.replaceChildren();if(!ms)return;const rows=ms.filter(r=>r.aligned);if(!rows.length)return;
+dash.draw('labChart',el=>{const ms=S.M();el.replaceChildren();if(!ms)return;const rows=ms.filter(r=>r.aligned&&r.sal_split);if(!rows.length)return;
+  const w=el.clientWidth||600,h=280,m={t:22,r:8,b:24,l:54},G=[['sana','Sana',dash.colors[0]],['rest','Restaurant','var(--cds-chart-status-critical)']];
+  const x0=d3.scaleBand().domain(rows.map(r=>r.month)).range([m.l,w-m.r]).padding(0.2),x1=d3.scaleBand().domain(['sana','rest']).range([0,x0.bandwidth()]).padding(0.12);
+  const sv=(r,k)=>k==='sana'?r.sana_net:r.rest_net,lv=(r,k)=>k==='sana'?r.labx_sana:r.labx_rest,hv=(r,k)=>k==='sana'?r.lab_sana:r.lab_rest,qv=(r,k)=>k==='sana'?r.sal_sana:r.sal_rest;
+  const y=d3.scaleLinear().domain([0,d3.max(rows,r=>Math.max(r.sana_net,r.rest_net,r.labx_sana,r.labx_rest))*1.12]).nice().range([h-m.b,m.t]);
+  const svg=d3.select(el).append('svg').attr('width',w).attr('height',h).attr('role','img').attr('aria-label','Sales and labour cost by month for Sana and the restaurant, with labour as a share of sales');
+  svg.append('g').attr('transform','translate('+m.l+',0)').call(d3.axisLeft(y).ticks(5).tickSize(-(w-m.l-m.r)).tickFormat(S.fk)).call(g=>g.select('.domain').remove()).call(S.axisStyle).call(g=>g.selectAll('line').style('stroke','var(--cds-chart-grid)'));
+  svg.append('g').attr('transform','translate(0,'+(h-m.b)+')').call(d3.axisBottom(x0).tickSize(0).tickFormat(k=>{const r=rows.find(q=>q.month===k);return S.mshort(k)+(r&&!r.full?'*':'');})).call(g=>g.select('.domain').remove()).call(S.axisStyle);
+  const tip=d3.select(el).append('div').attr('class','tip').style('display','none');
+  rows.forEach(r=>G.forEach(g=>{const X=x0(r.month)+x1(g[0]),bw=x1.bandwidth(),s=sv(r,g[0]),l=lv(r,g[0]),pc=s?l/s*100:0;
+    const t=r.label+' · '+g[1]+': sales '+S.f0(s)+', labour '+S.f0(l)+' ('+S.f0(hv(r,g[0]))+' hours + '+S.f0(qv(r,g[0]))+' salary) = '+Math.round(pc)+'% of sales';
+    const on=ev=>{const q=d3.pointer(ev,el);tip.style('display','block').style('left',Math.max(0,Math.min(q[0]+10,w-420))+'px').style('top',Math.max(0,q[1]-40)+'px').text(t);},off=()=>tip.style('display','none');
+    svg.append('rect').attr('x',X).attr('width',bw).attr('y',y(s)).attr('height',y(0)-y(s)).style('fill',g[2]).style('opacity',0.22).on('mousemove',on).on('mouseleave',off);
+    svg.append('rect').attr('x',X+bw*0.2).attr('width',bw*0.6).attr('y',y(l)).attr('height',y(0)-y(l)).style('fill',g[2]).style('opacity',r.full?1:0.75).on('mousemove',on).on('mouseleave',off);
+    svg.append('text').attr('x',X+bw/2).attr('y',y(Math.max(s,l))-5).attr('text-anchor','middle').text(Math.round(pc)+'%').style('fill',pc>=100?'var(--color-bad)':'var(--cds-text-secondary)').style('font-size','10.5px');}));
+  const lg=d3.select(el).append('div').attr('class','legend');G.forEach(g=>{[[0.22,' sales'],[1,' labour']].forEach(a=>{const s=lg.append('span');s.append('i').style('background',g[2]).style('opacity',a[0]);s.append('span').text(g[1]+a[1]);});});});
+dash.draw('sideChart',el=>{const ms=S.M();el.replaceChildren();if(!ms)return;const rows=ms.filter(r=>r.aligned&&r.sal_split);if(!rows.length)return;
   const w=el.clientWidth||600,h=280,m={t:14,r:8,b:24,l:54},net=r=>r.con_sana+r.con_rest-r.shared,K=[['con_sana','Sana',dash.colors[0]],['con_rest','Restaurant','var(--cds-chart-status-critical)']];
   const x=d3.scaleBand().domain(rows.map(r=>r.month)).range([m.l,w-m.r]).padding(0.28);
   const lo=d3.min(rows,r=>Math.min(0,net(r),d3.sum(K,k=>Math.min(0,r[k[0]])))),hi=d3.max(rows,r=>Math.max(0,net(r),d3.sum(K,k=>Math.max(0,r[k[0]]))));

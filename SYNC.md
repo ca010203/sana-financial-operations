@@ -11,6 +11,7 @@ document, which source artifact and asset each dataset was copied from.
 | pos_dept | cd9059e8-0a5d-4748-ac62-3abcc248f698 | dept |
 | hours_hourly | 4e43cb55-31fc-4c45-b05f-1ed632c9bbac | hours_by_hour |
 | ledger, costcalc, seasonal | 39790ac4-3bae-4a9d-815d-a15c22e825ff | ledger, costcalc, seasonal |
+| salaries | (set by hand) | salaried lead per side from a given month: Adrienne on Sana, Jonah on the restaurant. Add a row with a new from_month when salaries change. |
 
 ## Sync steps (run daily by a scheduled task, or right after refreshing any source)
 
